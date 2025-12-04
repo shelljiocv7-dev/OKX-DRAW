@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模擬加密貨幣K線圖網站</title>
+    <style>
+        body {
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-y: scroll;
+        }
+        #logo-header {
+            background-color: #121212;
+            padding: 10px;
+            text-align: center;
+            border-bottom: 1px solid #333;
+        }
+        #logo-header img {
+            max-width: 100%;
+            height: auto;
+        }
+        #header {
+            background-color: #121212;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #333;
+        }
+        #coin-selector {
+            display: flex;
+            align-items: center;
+        }
+        #coin-symbol {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+        #add-coin, #change-price {
+            background-color: #1f1f1f;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            padding: 5px 10px;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+        #time-settings {
+            display: flex;
+            align-items: center;
+        }
+        #start-time, #interval {
+            background-color: #1f1f1f;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            margin-right: 5px;
+        }
+        #fullscreen-btn {
+            background-color: #1f1f1f;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        #container {
+            display: flex;
+            border-bottom: 1px solid #333;
+        }
+        #left-sidebar {
+            width: 200px;
+            background-color: #121212;
+            padding: 10px;
+            height: calc(100vh - 120px);
+            overflow-y: auto;
+            border-right: 1px solid #333;
+        }
+        .coin-item {
+            padding: 5px;
+            cursor: pointer;
+            border-bottom: 1px solid #222;
+        }
+        .coin-item.selected {
+            background-color: #1f1f1f;
+        }
+        #main-chart {
+            flex: 1;
+            position: relative;
+        }
+        #chart-canvas {
+            width: 100%;
+            height: 600px;
+            background-color: #000;
+        }
+        #edit-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #121212;
+            padding: 10px;
+            border: 1px solid #333;
+            display: none;
+        }
+        #edit-panel input {
+            width: 80px;
+            margin: 5px 0;
+            background-color: #1f1f1f;
+            border: 1px solid #333;
+            color: #e0e0e0;
+        }
+        #add-bar, #quick-mode, #draw-tool {
+            background-color: #1f1f1f;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            padding: 5px 10px;
+            margin: 5px 0;
+            cursor: pointer;
+        }
+        #order-panel {
+            background-color: #121212;
+            padding: 10px;
+            border-bottom: 1px solid #333;
+        }
+        #order-form {
+            display: flex;
+            justify-content: space-around;
+        }
+        .order-type {
+            width: 45%;
+            padding: 10px;
+            background-color: #1f1f1f;
+            border: 1px solid #333;
+        }
+        .buy { background-color: #0e2a1e; } /* Darker green base */
+        .sell { background-color: #2a0e1e; } /* Darker red base */
+        .buy button { background-color: #25a750; color: #fff; }
+        .sell button { background-color: #ca3f64; color: #fff; }
+        #positions {
+            background-color: #121212;
+            padding: 10px;
+        }
+        #positions-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #positions-table th, #positions-table td {
+            border: 1px solid #333;
+            padding: 5px;
+            text-align: center;
+        }
+        #positions-table input {
+            background-color: #1f1f1f;
+            border: none;
+            color: #e0e0e0;
+            width: 100%;
+        }
+        /* Modal */
+        #modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        #modal-content {
+            background-color: #121212;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #333;
+            width: 300px;
+        }
+        #close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        #close-modal:hover {
+            color: #fff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="logo-header">
+        <img src="https://iq.wiki/cdn-cgi/image/width=1920,quality=70/https://ipfs.everipedia.org/ipfs/QmQH7MD3r5YZgcAxv1GKRo8UdvknLtsX5h5uzV7YArwSYi" alt="OKX Logo">
+    </div>
+    <div id="header">
+        <div id="coin-selector">
+            <span id="coin-symbol">BTC/USDT</span>
+            <button id="add-coin">添加幣種</button>
+            <button id="change-price">更改價格</button>
+        </div>
+        <div id="time-settings">
+            <label>開始時間:</label>
+            <input type="datetime-local" id="start-time" value="2025-12-04T00:00">
+            <label>時間週期 (分):</label>
+            <select id="interval">
+                <option value="1">1m</option>
+                <option value="5">5m</option>
+                <option value="15">15m</option>
+                <option value="60">1h</option>
+            </select>
+        </div>
+        <button id="fullscreen-btn">全螢幕</button>
+    </div>
+    <div id="container">
+        <div id="left-sidebar">
+            <div class="coin-item selected" data-coin="BTC/USDT">BTC/USDT +1.66%</div>
+            <div class="coin-item" data-coin="ETH/USDT">ETH/USDT +3.33%</div>
+            <!-- Add more as needed -->
+        </div>
+        <div id="main-chart">
+            <canvas id="chart-canvas"></canvas>
+            <div id="edit-panel">
+                <h4>編輯K線</h4>
+                <label>開盤:</label><input type="number" id="edit-open"><br>
+                <label>最高:</label><input type="number" id="edit-high"><br>
+                <label>最低:</label><input type="number" id="edit-low"><br>
+                <label>收盤:</label><input type="number" id="edit-close"><br>
+                <button id="save-edit">保存</button>
+            </div>
+            <button id="add-bar">添加K線</button>
+            <button id="quick-mode">快速繪圖模式</button>
+            <button id="draw-tool">繪製線條</button>
+        </div>
+    </div>
+    <div id="order-panel">
+        <h3>下單</h3>
+        <div id="order-form">
+            <div class="order-type buy">
+                <h4>市價買入</h4>
+                <label>槓桿倍數:</label>
+                <select>
+                    <option>1x</option>
+                    <option>5x</option>
+                    <option>10x</option>
+                    <option>20x</option>
+                </select><br>
+                <label>數量:</label><input type="number"><br>
+                <label>止盈:</label><input type="number"><br>
+                <label>止損:</label><input type="number"><br>
+                <button>買入</button>
+            </div>
+            <div class="order-type sell">
+                <h4>市價賣出</h4>
+                <label>槓桿倍數:</label>
+                <select>
+                    <option>1x</option>
+                    <option>5x</option>
+                    <option>10x</option>
+                    <option>20x</option>
+                </select><br>
+                <label>數量:</label><input type="number"><br>
+                <label>止盈:</label><input type="number"><br>
+                <label>止損:</label><input type="number"><br>
+                <button>賣出</button>
+            </div>
+        </div>
+    </div>
+    <div id="positions">
+        <h3>持倉</h3>
+        <table id="positions-table">
+            <thead>
+                <tr>
+                    <th>幣種</th>
+                    <th>方向</th>
+                    <th>進場價格</th>
+                    <th>數量</th>
+                    <th>強平價格</th>
+                    <th>盈虧</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Positions added dynamically -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal for adding coin -->
+    <div id="modal">
+        <div id="modal-content">
+            <span id="close-modal">&times;</span>
+            <h4>添加新幣種</h4>
+            <label>幣種符號:</label><input type="text" id="new-coin-symbol"><br>
+            <label>初始價格:</label><input type="number" id="new-coin-price"><br>
+            <label>變動百分比:</label><input type="text" id="new-coin-change"><br>
+            <button id="save-new-coin">保存</button>
+        </div>
+    </div>
+
+    <script>
+        let bars = []; // {time: Date, open: num, high: num, low: num, close: num}
+        let currentCoin = 'BTC/USDT';
+        let startTime = new Date('2025-12-04T00:00:00');
+        let interval = 1 * 60 * 1000; // ms
+        let selectedBarIndex = -1;
+        let quickMode = false;
+        let drawMode = false;
+        let lines = []; // {startX, startY, endX, endY}
+        let positions = [];
+        let offsetX = 0;
+        let scale = 1;
+        let isPanning = false;
+        let startPanX = 0;
+
+        const canvas = document.getElementById('chart-canvas');
+        const ctx = canvas.getContext('2d', { alpha: false }); // For better quality
+        const barWidth = 10;
+        const padding = 40; // Increased for axes labels
+
+        function drawChart() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (bars.length === 0) return;
+
+            const visibleBars = bars.length * scale;
+            const minPrice = Math.min(...bars.map(b => Math.min(b.low, b.open, b.close)));
+            const maxPrice = Math.max(...bars.map(b => Math.max(b.high, b.open, b.close)));
+            const priceRange = maxPrice - minPrice || 1;
+            const height = canvas.height - padding * 2;
+            const width = canvas.width - padding * 2;
+            const barSpacing = width / Math.max(bars.length, 1);
+
+            // Draw grid
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 0.5;
+            const gridLines = 10;
+            for (let i = 0; i <= gridLines; i++) {
+                // Horizontal
+                const y = padding + (i * height / gridLines);
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+
+                // Vertical (simplified)
+                const x = padding + (i * width / gridLines) + offsetX;
+                if (x >= padding && x <= canvas.width) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, padding);
+                    ctx.lineTo(x, canvas.height - padding);
+                    ctx.stroke();
+                }
+            }
+
+            // Draw price axis
+            ctx.fillStyle = '#888';
+            ctx.font = '12px Arial';
+            for (let i = 0; i <= 5; i++) {
+                const price = minPrice + (priceRange * i / 5);
+                const y = padding + height - (height * i / 5);
+                ctx.fillText(price.toFixed(2), 5, y + 5);
+            }
+
+            // Draw time axis
+            bars.forEach((bar, i) => {
+                if (i % 5 === 0) { // Every 5 bars
+                    const x = padding + (i * barSpacing * scale) + offsetX + (barSpacing * scale / 2);
+                    if (x >= padding && x <= canvas.width - padding) {
+                        ctx.fillText(bar.time.toLocaleTimeString('zh-TW', {hour: '2-digit', minute: '2-digit'}), x - 20, canvas.height - 10);
+                    }
+                }
+            });
+
+            // Draw bars
+            bars.forEach((bar, i) => {
+                const scaledSpacing = barSpacing * scale;
+                const x = padding + (i * scaledSpacing) + offsetX;
+                if (x + barWidth < padding || x > canvas.width) return; // Off-screen
+
+                const openY = padding + height - ((bar.open - minPrice) / priceRange * height);
+                const closeY = padding + height - ((bar.close - minPrice) / priceRange * height);
+                const highY = padding + height - ((bar.high - minPrice) / priceRange * height);
+                const lowY = padding + height - ((bar.low - minPrice) / priceRange * height);
+
+                // Wick
+                ctx.strokeStyle = bar.close > bar.open ? '#25a750' : '#ca3f64';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x + barWidth / 2, highY);
+                ctx.lineTo(x + barWidth / 2, lowY);
+                ctx.stroke();
+
+                // Body
+                ctx.fillStyle = bar.close > bar.open ? '#25a750' : '#ca3f64';
+                ctx.fillRect(x, Math.min(openY, closeY), barWidth, Math.abs(openY - closeY) || 1); // Min height 1
+            });
+
+            // Draw lines
+            ctx.strokeStyle = '#ffff00';
+            ctx.lineWidth = 1;
+            lines.forEach(line => {
+                ctx.beginPath();
+                ctx.moveTo(line.startX + offsetX, line.startY);
+                ctx.lineTo(line.endX + offsetX, line.endY);
+                ctx.stroke();
+            });
+        }
+
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {x: e.clientX - rect.left, y: e.clientY - rect.top};
+        }
+
+        let dragPart = null;
+        let dragStartY = 0;
+        let dragStartValue = 0;
+
+        canvas.addEventListener('mousedown', (e) => {
+            const pos = getMousePos(e);
+            if (quickMode) {
+                lastQuickX = pos.x;
+                lastQuickY = pos.y;
+                return;
+            }
+            if (drawMode) {
+                lines.push({startX: pos.x - offsetX, startY: pos.y, endX: pos.x - offsetX, endY: pos.y});
+                return;
+            }
+            if (e.button === 0 && !dragPart) {
+                isPanning = true;
+                startPanX = pos.x - offsetX;
+                return;
+            }
+            selectedBarIndex = findBarAt(pos.x);
+            if (selectedBarIndex !== -1) {
+                const bar = bars[selectedBarIndex];
+                const height = canvas.height - padding * 2;
+                const openY = padding + height - ((bar.open - minPrice) / priceRange * height);
+                const closeY = padding + height - ((bar.close - minPrice) / priceRange * height);
+                const highY = padding + height - ((bar.high - minPrice) / priceRange * height);
+                const lowY = padding + height - ((bar.low - minPrice) / priceRange * height);
+
+                if (Math.abs(pos.y - highY) < 5) {
+                    dragPart = 'high';
+                    dragStartY = pos.y;
+                    dragStartValue = bar.high;
+                } else if (Math.abs(pos.y - lowY) < 5) {
+                    dragPart = 'low';
+                    dragStartY = pos.y;
+                    dragStartValue = bar.low;
+                } else if (pos.y >= Math.min(openY, closeY) && pos.y <= Math.max(openY, closeY)) {
+                    dragPart = 'body';
+                    dragStartY = pos.y;
+                    dragStartValue = bar.open; // For body drag
+                } else {
+                    showEditPanel(bar);
+                }
+            }
+        });
+
+        let lastQuickX = 0;
+        let lastQuickY = 0;
+        let quickThreshold = 20; // pixels to move horizontally to add new bar
+
+        canvas.addEventListener('mousemove', (e) => {
+            const pos = getMousePos(e);
+            if (quickMode && e.buttons === 1) {
+                if (Math.abs(pos.x - lastQuickX) > quickThreshold) {
+                    addQuickBar(pos);
+                    lastQuickX = pos.x;
+                }
+                lastQuickY = pos.y;
+                return;
+            }
+            if (drawMode && e.buttons === 1 && lines.length > 0) {
+                const lastLine = lines[lines.length - 1];
+                lastLine.endX = pos.x - offsetX;
+                lastLine.endY = pos.y;
+                drawChart();
+            }
+            if (isPanning && e.buttons === 1) {
+                offsetX = pos.x - startPanX;
+                drawChart();
+            }
+            if (dragPart && selectedBarIndex !== -1 && e.buttons === 1) {
+                const deltaY = pos.y - dragStartY;
+                const minPrice = Math.min(...bars.map(b => Math.min(b.low, b.open, b.close)));
+                const priceRange = Math.max(...bars.map(b => Math.max(b.high, b.open, b.close))) - minPrice || 1;
+                const deltaPrice = (deltaY / (canvas.height - padding * 2)) * priceRange * -1; // Invert y
+                const bar = bars[selectedBarIndex];
+                if (dragPart === 'high') {
+                    bar.high = dragStartValue + deltaPrice;
+                    if (bar.high < Math.max(bar.open, bar.close)) bar.high = Math.max(bar.open, bar.close);
+                } else if (dragPart === 'low') {
+                    bar.low = dragStartValue + deltaPrice;
+                    if (bar.low > Math.min(bar.open, bar.close)) bar.low = Math.min(bar.open, bar.close);
+                } else if (dragPart === 'body') {
+                    const delta = deltaPrice;
+                    bar.open += delta;
+                    bar.close += delta;
+                    bar.high += delta;
+                    bar.low += delta;
+                    if (selectedBarIndex > 0) bars[selectedBarIndex - 1].close = bar.open;
+                    if (selectedBarIndex < bars.length - 1) bars[selectedBarIndex + 1].open = bar.close;
+                }
+                drawChart();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            dragPart = null;
+            isPanning = false;
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY < 0 ? 0.1 : -0.1;
+            const oldScale = scale;
+            scale = Math.max(0.5, scale + delta);
+            // Adjust offset to zoom towards mouse
+            const pos = getMousePos(e);
+            offsetX = pos.x - (pos.x - offsetX) * (scale / oldScale);
+            drawChart();
+        });
+
+        function findBarAt(x) {
+            const scaledSpacing = (canvas.width - padding * 2) / bars.length * scale;
+            const i = Math.floor((x - padding - offsetX) / scaledSpacing);
+            if (i >= 0 && i < bars.length) return i;
+            return -1;
+        }
+
+        function showEditPanel(bar) {
+            document.getElementById('edit-open').value = bar.open;
+            document.getElementById('edit-high').value = bar.high;
+            document.getElementById('edit-low').value = bar.low;
+            document.getElementById('edit-close').value = bar.close;
+            document.getElementById('edit-panel').style.display = 'block';
+        }
+
+        document.getElementById('save-edit').addEventListener('click', () => {
+            if (selectedBarIndex !== -1) {
+                const bar = bars[selectedBarIndex];
+                const newOpen = parseFloat(document.getElementById('edit-open').value);
+                const newHigh = parseFloat(document.getElementById('edit-high').value);
+                const newLow = parseFloat(document.getElementById('edit-low').value);
+                const newClose = parseFloat(document.getElementById('edit-close').value);
+
+                bar.open = newOpen;
+                bar.high = Math.max(newHigh, Math.max(newOpen, newClose));
+                bar.low = Math.min(newLow, Math.min(newOpen, newClose));
+                bar.close = newClose;
+
+                if (selectedBarIndex > 0) {
+                    bars[selectedBarIndex - 1].close = newOpen;
+                }
+                if (selectedBarIndex < bars.length - 1) {
+                    bars[selectedBarIndex + 1].open = newClose;
+                }
+
+                drawChart();
+                document.getElementById('edit-panel').style.display = 'none';
+            }
+        });
+
+        document.getElementById('add-bar').addEventListener('click', () => {
+            let lastTime = startTime.getTime();
+            let lastClose = 10000;
+            if (bars.length > 0) {
+                lastTime = bars[bars.length - 1].time.getTime() + interval;
+                lastClose = bars[bars.length - 1].close;
+            }
+            bars.push({
+                time: new Date(lastTime),
+                open: lastClose,
+                high: lastClose + Math.random() * 100,
+                low: lastClose - Math.random() * 100,
+                close: lastClose + (Math.random() - 0.5) * 50
+            });
+            drawChart();
+        });
+
+        document.getElementById('quick-mode').addEventListener('click', () => {
+            quickMode = !quickMode;
+            document.getElementById('quick-mode').textContent = quickMode ? '退出快速模式' : '快速繪圖模式';
+        });
+
+        function addQuickBar(pos) {
+            if (bars.length === 0) {
+                document.getElementById('add-bar').click();
+                return;
+            }
+            const delta = (lastQuickY - pos.y) / 10; // Scale delta
+            const lastBar = bars[bars.length - 1];
+            const newOpen = lastBar.close;
+            const newClose = newOpen + delta;
+            const newHigh = Math.max(newOpen, newClose) + Math.abs(delta) * 0.2;
+            const newLow = Math.min(newOpen, newClose) - Math.abs(delta) * 0.2;
+            bars.push({
+                time: new Date(lastBar.time.getTime() + interval),
+                open: newOpen,
+                high: newHigh,
+                low: newLow,
+                close: newClose
+            });
+            drawChart();
+        }
+
+        document.getElementById('draw-tool').addEventListener('click', () => {
+            drawMode = !drawMode;
+            document.getElementById('draw-tool').textContent = drawMode ? '退出繪製' : '繪製線條';
+        });
+
+        document.getElementById('add-coin').addEventListener('click', () => {
+            document.getElementById('modal').style.display = 'block';
+        });
+
+        document.getElementById('close-modal').addEventListener('click', () => {
+            document.getElementById('modal').style.display = 'none';
+        });
+
+        document.getElementById('save-new-coin').addEventListener('click', () => {
+            const symbol = document.getElementById('new-coin-symbol').value;
+            const price = document.getElementById('new-coin-price').value;
+            const change = document.getElementById('new-coin-change').value;
+            if (symbol) {
+                const item = document.createElement('div');
+                item.className = 'coin-item';
+                item.dataset.coin = symbol;
+                item.textContent = `${symbol} ${change}`;
+                document.getElementById('left-sidebar').appendChild(item);
+                document.getElementById('modal').style.display = 'none';
+            }
+        });
+
+        document.getElementById('left-sidebar').addEventListener('click', (e) => {
+            if (e.target.classList.contains('coin-item')) {
+                document.querySelectorAll('.coin-item').forEach(item => item.classList.remove('selected'));
+                e.target.classList.add('selected');
+                currentCoin = e.target.dataset.coin;
+                document.getElementById('coin-symbol').textContent = currentCoin;
+                // Simulate switching chart data, clear bars for simplicity
+                bars = [];
+                drawChart();
+            }
+        });
+
+        document.getElementById('change-price').addEventListener('click', () => {
+            if (bars.length > 0) {
+                const newPrice = parseFloat(prompt('輸入新價格:'));
+                if (!isNaN(newPrice)) {
+                    bars[bars.length - 1].close = newPrice;
+                    drawChart();
+                }
+            }
+        });
+
+        document.getElementById('start-time').addEventListener('change', (e) => {
+            startTime = new Date(e.target.value);
+            if (bars.length > 0) bars[0].time = startTime;
+            bars.forEach((bar, i) => bar.time = new Date(startTime.getTime() + i * interval));
+            drawChart();
+        });
+
+        document.getElementById('interval').addEventListener('change', (e) => {
+            interval = parseInt(e.target.value) * 60 * 1000;
+            bars.forEach((bar, i) => bar.time = new Date(startTime.getTime() + i * interval));
+            drawChart();
+        });
+
+        document.getElementById('fullscreen-btn').addEventListener('click', () => {
+            if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+        });
+
+        // Order placement
+        const buyBtn = document.querySelector('#order-form .buy button');
+        const sellBtn = document.querySelector('#order-form .sell button');
+
+        buyBtn.addEventListener('click', () => {
+            const leverage = document.querySelector('#order-form .buy select').value;
+            const amount = parseFloat(document.querySelector('#order-form .buy input[type=number]:nth-of-type(1)').value);
+            const tp = parseFloat(document.querySelector('#order-form .buy input[type=number]:nth-of-type(2)').value);
+            const sl = parseFloat(document.querySelector('#order-form .buy input[type=number]:nth-of-type(3)').value);
+            if (!isNaN(amount)) {
+                const entry = bars.length > 0 ? bars[bars.length - 1].close : 10000;
+                positions.push({
+                    symbol: currentCoin,
+                    side: '多頭',
+                    entry: entry,
+                    amount: amount,
+                    liq: entry * (1 - 1/parseFloat(leverage)) , // Simplified
+                    pnl: 0
+                });
+                updatePositionsTable();
+            }
+        });
+
+        sellBtn.addEventListener('click', () => {
+            const leverage = document.querySelector('#order-form .sell select').value;
+            const amount = parseFloat(document.querySelector('#order-form .sell input[type=number]:nth-of-type(1)').value);
+            const tp = parseFloat(document.querySelector('#order-form .sell input[type=number]:nth-of-type(2)').value);
+            const sl = parseFloat(document.querySelector('#order-form .sell input[type=number]:nth-of-type(3)').value);
+            if (!isNaN(amount)) {
+                const entry = bars.length > 0 ? bars[bars.length - 1].close : 10000;
+                positions.push({
+                    symbol: currentCoin,
+                    side: '空頭',
+                    entry: entry,
+                    amount: amount,
+                    liq: entry * (1 + 1/parseFloat(leverage)),
+                    pnl: 0
+                });
+                updatePositionsTable();
+            }
+        });
+
+        function updatePositionsTable() {
+            const tbody = document.querySelector('#positions-table tbody');
+            tbody.innerHTML = '';
+            positions.forEach((pos, i) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${pos.symbol}</td>
+                    <td>${pos.side}</td>
+                    <td><input type="number" value="${pos.entry}" onchange="updatePos(${i}, 'entry', this.value)"></td>
+                    <td><input type="number" value="${pos.amount}" onchange="updatePos(${i}, 'amount', this.value)"></td>
+                    <td>${pos.liq.toFixed(2)}</td>
+                    <td>${pos.pnl}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updatePos(index, field, value) {
+            positions[index][field] = parseFloat(value);
+            // Recalc liq if needed
+            updatePositionsTable();
+        }
+
+        // Initial draw
+        drawChart();
+    </script>
+</body>
+</html>
